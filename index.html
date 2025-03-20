@@ -1,11 +1,375 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Sinusoidal Embeddings Test</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Effect of Scale Factor on Sinusoidal Wavelengths</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .visualization-container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .controls {
+            margin-bottom: 20px;
+            background-color: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        input[type="range"] {
+            flex-grow: 1;
+        }
+        
+        .value-display {
+            background-color: #e9ecef;
+            padding: 5px 10px;
+            border-radius: 4px;
+            min-width: 80px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+        }
+        
+        .reference-lines {
+            margin-top: 15px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+        
+        .reference-line {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .color-box {
+            width: 15px;
+            height: 15px;
+            border-radius: 3px;
+        }
+        
+        .explanation {
+            background-color: #f8f9fa;
+            border-left: 4px solid #3498db;
+            padding: 15px;
+            margin-top: 20px;
+        }
+    </style>
 </head>
 <body>
-    <h1>GitHub Pages Test</h1>
-    <p>If you can see this message, your GitHub Pages deployment is working correctly!</p>
-    <p>This is a test page for the sinusoidal embeddings visualization.</p>
+    <h1>Effect of Scale Factor on Sinusoidal Wavelengths</h1>
+    
+    <div class="controls">
+        <div>
+            <div class="slider-container">
+                <label for="scaleFactorSlider">Scale Factor:</label>
+                <input type="range" id="scaleFactorSlider" min="1" max="5" step="0.05" value="4">
+                <span id="scaleFactorValue" class="value-display">10000</span>
+            </div>
+            <small>Move the slider to see how the scale factor affects the wavelengths</small>
+        </div>
+        
+        <div class="slider-container">
+            <label for="dimensionSlider">Dimension:</label>
+            <input type="range" id="dimensionSlider" min="0" max="510" step="2" value="16">
+            <span id="dimensionValue" class="value-display">16</span>
+        </div>
+        
+        <div>
+            <label>
+                <input type="checkbox" id="showReferenceLines" checked> Show reference scale factors
+            </label>
+        </div>
+    </div>
+    
+    <div class="visualization-container">
+        <div class="chart-container">
+            <canvas id="wavelengthChart"></canvas>
+        </div>
+        
+        <div class="reference-lines">
+            <div class="reference-line">
+                <div class="color-box" style="background-color: rgba(255, 159, 64, 1);"></div>
+                <span>Scale Factor = 100</span>
+            </div>
+            <div class="reference-line">
+                <div class="color-box" style="background-color: rgba(75, 192, 192, 1);"></div>
+                <span>Current Scale Factor</span>
+            </div>
+            <div class="reference-line">
+                <div class="color-box" style="background-color: rgba(255, 99, 132, 1);"></div>
+                <span>Scale Factor = 100,000</span>
+            </div>
+        </div>
+    </div>
+    
+    <div class="visualization-container">
+        <h3>Wavelength Comparison</h3>
+        <div class="chart-container">
+            <canvas id="wavelengthComparisonChart"></canvas>
+        </div>
+    </div>
+    
+    <div class="explanation">
+        <h3>What's happening here?</h3>
+        <p>This visualization demonstrates how the scale factor in the positional encoding formula affects sinusoidal wavelengths:</p>
+        <p><code>PE(pos, 2i) = sin(pos / (scaleFactor^(2i/d_model)))</code></p>
+        
+        <p><strong>Key observations:</strong></p>
+        <ul>
+            <li><strong>Smaller scale factors (e.g., 100)</strong>: Create shorter wavelengths, causing faster oscillations. The pattern repeats more frequently, which limits the ability to represent long sequences without position ambiguity.</li>
+            <li><strong>Larger scale factors (e.g., 100,000)</strong>: Create longer wavelengths, causing slower oscillations. This allows for representing very long sequences, but may dedicate fewer dimensions to capturing local patterns.</li>
+            <li><strong>The value 10,000</strong>: Provides a good balance - long enough to handle typical document lengths but with sufficient coverage of shorter wavelengths for local patterns.</li>
+        </ul>
+        
+        <p>Try different dimensions to see how the wavelength varies across the embedding space!</p>
+    </div>
+
+    <script>
+        // Configuration
+        let scaleFactor = 10000;
+        const d_model = 512;
+        const maxPosition = 60;
+        let dimension = 16;
+        let showReferenceLines = true;
+        let wavelengthChart;
+        let wavelengthComparisonChart;
+        
+        // DOM elements
+        const scaleFactorSlider = document.getElementById('scaleFactorSlider');
+        const scaleFactorDisplay = document.getElementById('scaleFactorValue');
+        const dimensionSlider = document.getElementById('dimensionSlider');
+        const dimensionDisplay = document.getElementById('dimensionValue');
+        const showReferenceLinesCheckbox = document.getElementById('showReferenceLines');
+        
+        // Convert logarithmic slider to scale factor
+        function sliderToScaleFactor(sliderValue) {
+            return Math.round(Math.pow(10, sliderValue));
+        }
+        
+        // Convert scale factor to logarithmic slider value
+        function scaleFactorToSlider(factor) {
+            return Math.log10(factor);
+        }
+        
+        // Initialize with correct slider value
+        scaleFactorSlider.value = scaleFactorToSlider(scaleFactor);
+        
+        // Calculate positional encoding
+        function calculatePE(pos, dim, scale) {
+            const i = Math.floor(dim / 2);
+            if (dim % 2 === 0) {
+                return Math.sin(pos / Math.pow(scale, (2 * i) / d_model));
+            } else {
+                return Math.cos(pos / Math.pow(scale, (2 * i - 1) / d_model));
+            }
+        }
+        
+        // Calculate theoretical wavelength
+        function calculateWavelength(dim, scale) {
+            const i = Math.floor(dim / 2);
+            const denominator = Math.pow(scale, (2 * i) / d_model);
+            return 2 * Math.PI * denominator;
+        }
+        
+        // Initialize charts
+        function initCharts() {
+            // Main wavelength pattern chart
+            const ctx = document.getElementById('wavelengthChart').getContext('2d');
+            wavelengthChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({length: maxPosition}, (_, i) => i),
+                    datasets: []
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Positional Encoding Value'
+                            },
+                            min: -1.1,
+                            max: 1.1
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Word Position in Sequence'
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Sinusoidal Encoding Pattern'
+                        },
+                        legend: {
+                            display: true,
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+            
+            // Wavelength comparison chart for different scale factors
+            const comparisonCtx = document.getElementById('wavelengthComparisonChart').getContext('2d');
+            wavelengthComparisonChart = new Chart(comparisonCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['100', '1,000', '10,000', '100,000'],
+                    datasets: [{
+                        label: 'Wavelength (number of positions)',
+                        backgroundColor: [
+                            'rgba(255, 159, 64, 0.7)',
+                            'rgba(54, 162, 235, 0.7)', 
+                            'rgba(75, 192, 192, 0.7)',
+                            'rgba(255, 99, 132, 0.7)'
+                        ],
+                        borderColor: [
+                            'rgba(255, 159, 64, 1)',
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(255, 99, 132, 1)'
+                        ],
+                        borderWidth: 1,
+                        data: []
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Wavelength (positions)'
+                            },
+                            type: 'logarithmic'
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Update main chart
+        function updateChart() {
+            // Update chart title
+            wavelengthChart.options.plugins.title.text = `Sinusoidal Encoding Pattern for Dimension ${dimension}`;
+            
+            // Clear existing datasets
+            wavelengthChart.data.datasets = [];
+            
+            // Add current scale factor dataset
+            wavelengthChart.data.datasets.push({
+                label: `Scale Factor = ${scaleFactor}`,
+                data: Array.from({length: maxPosition}, (_, pos) => calculatePE(pos, dimension, scaleFactor)),
+                borderColor: 'rgba(75, 192, 192, 1)',
+                backgroundColor: 'transparent',
+                borderWidth: 3
+            });
+            
+            // Add reference lines if enabled
+            if (showReferenceLines) {
+                // Small scale factor (100)
+                wavelengthChart.data.datasets.push({
+                    label: 'Scale Factor = 100 (Compressed)',
+                    data: Array.from({length: maxPosition}, (_, pos) => calculatePE(pos, dimension, 100)),
+                    borderColor: 'rgba(255, 159, 64, 1)',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    borderDash: [5, 5]
+                });
+                
+                // Large scale factor (100,000)
+                wavelengthChart.data.datasets.push({
+                    label: 'Scale Factor = 100,000 (Stretched)',
+                    data: Array.from({length: maxPosition}, (_, pos) => calculatePE(pos, dimension, 100000)),
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    borderDash: [5, 5]
+                });
+            }
+            
+            wavelengthChart.update();
+            
+            // Update comparison chart
+            const scaleFactors = [100, 1000, 10000, 100000];
+            const wavelengths = scaleFactors.map(sf => calculateWavelength(dimension, sf));
+            
+            wavelengthComparisonChart.data.datasets[0].data = wavelengths.map(w => Math.round(w * 100) / 100);
+            wavelengthComparisonChart.options.plugins.title = {
+                display: true,
+                text: `Wavelength Comparison for Dimension ${dimension}`
+            };
+            wavelengthComparisonChart.update();
+        }
+        
+        // Event listeners
+        scaleFactorSlider.addEventListener('input', function() {
+            scaleFactor = sliderToScaleFactor(parseFloat(this.value));
+            scaleFactorDisplay.textContent = scaleFactor;
+            updateChart();
+        });
+        
+        dimensionSlider.addEventListener('input', function() {
+            dimension = parseInt(this.value);
+            dimensionDisplay.textContent = dimension;
+            updateChart();
+        });
+        
+        showReferenceLinesCheckbox.addEventListener('change', function() {
+            showReferenceLines = this.checked;
+            updateChart();
+        });
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initCharts();
+            updateChart();
+        });
+    </script>
 </body>
 </html>
